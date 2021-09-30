@@ -29,7 +29,6 @@ class DatabaseMongo:
         :param prev_hits: the prev number of hits between the 2 cities
         :return: None
         """
-        # doc1 = self._cities_distance.find({SOURCE: destination, DESTINATION: source})
         query1 = {SOURCE: source, DESTINATION: destination}
         query2 = {SOURCE: destination, DESTINATION: source}
         new_values = {"$set": {HITS: prev_hits + 1}}
