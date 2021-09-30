@@ -56,19 +56,25 @@ class DatabaseMongo:
         self._update_hits(source, destination, distance, prev_hits)
         return distance
 
-    def add_cities_to_db(self, source, destination, distance):
+    def add_cities_to_db(self, source, destination, distance, is_post_insert=False):
         """
         adds two citie and their distance to the database.
         :param source: source city
         :param destination: destination city
         :param distance: the distance between the two cities in km
+        :param is_post_insert: specify if the cities are added as a post or a GET
         :return: None
         """
-        self._cities_distance.insert_many(
-            [{SOURCE: source, DESTINATION: destination, DISTANCE: distance, HITS: 1},
-             {SOURCE: destination, DESTINATION: source, DISTANCE: distance, HITS: 1}])
-        if self._max_hits_db.find_one() is None:  # if it's the first pair of cities then they are the max hits.
-            self._max_hits_db.insert_one({SOURCE: source, DESTINATION: destination, DISTANCE: distance, HITS: 1})
+        if not is_post_insert:
+            self._cities_distance.insert_many(
+                [{SOURCE: source, DESTINATION: destination, DISTANCE: distance, HITS: 1},
+                 {SOURCE: destination, DESTINATION: source, DISTANCE: distance, HITS: 1}])
+            if self._max_hits_db.find_one() is None:  # if it's the first pair of cities then they are the max hits.
+                self._max_hits_db.insert_one({SOURCE: source, DESTINATION: destination, DISTANCE: distance, HITS: 1})
+        else:
+            self._cities_distance.insert_many(
+                [{SOURCE: source, DESTINATION: destination, DISTANCE: distance, HITS: 0},
+                 {SOURCE: destination, DESTINATION: source, DISTANCE: distance, HITS: 0}])
 
     def get_most_popular_search(self):
         """
@@ -82,8 +88,31 @@ class DatabaseMongo:
         :return: True if ok False else.
         """
         try:
-            # The ismaster command is cheap and does not require auth.
             self._client.admin.command('ismaster')
             return True
         except Exception:
             return False
+
+    def update_cities_distance(self, dictionary):
+        """
+        :param dictionary: a dictionary with source, destination and distance keys.
+        :return: number of hits of those cities
+        """
+        x = self._cities_distance.find({SOURCE: dictionary[SOURCE], DESTINATION: dictionary[DESTINATION]})
+        if x.retrieved == 0:
+            self.add_cities_to_db(dictionary[SOURCE], dictionary[DESTINATION], dictionary[DISTANCE])
+            return 0
+        else:
+            query1 = {SOURCE: dictionary[SOURCE], DESTINATION: dictionary[DESTINATION]}
+            query2 = {SOURCE: dictionary[DESTINATION], DESTINATION: dictionary[SOURCE]}
+            new_values = {"$set": {DISTANCE: dictionary[DISTANCE]}}
+            self._cities_distance.update_one(query1, new_values)
+            self._cities_distance.update_one(query2, new_values)
+            temp = self._cities_distance.find(query1)
+            for result in temp:
+                return result[HITS]
+
+    def reset_db(self):
+        self._cities_distance.drop()
+        self._max_hits_db.drop()
+

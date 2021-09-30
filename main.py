@@ -10,6 +10,7 @@ DESTINATION = "destination"
 DISTANCE = "distance"
 HITS = "hits"
 FORMAT_STR = 'utf-8'
+PORT = 8080
 
 
 def get_cities(path: str):
@@ -32,22 +33,20 @@ def get_cities(path: str):
         return None, None
     return source, destination
 
-def parse_line_value(line, starts_with):
-    if not line.startswith(starts_with):
-        return None
-    line = line[len(starts_with):]
-    value = line[:line.find('\\')]
-    value = value.replace('"', '')
 
-
-def parse_post_body(body):
-    print(body)
-    lines = body.split(";")
-    if not lines[1].startswith('name=source\\r\\n\\r\\n'):
-        return None
-    lines[1] = lines[1][24:]
-
-
+def check_post_dictionary(dictionary):
+    """
+    :param dictionary: the dictionary to check
+    :return: True if the keys are the expected keys, False else.
+    """
+    if len(
+            dictionary) != 3 or DISTANCE not in dictionary.keys() or DESTINATION not in dictionary.keys() or SOURCE not in dictionary.keys():
+        return False
+    if type(dictionary[DESTINATION]) != str or type(dictionary[SOURCE]) != str:
+        return False
+    if not isinstance(dictionary[DISTANCE], (int, float)):
+        return False
+    return True
 
 
 data = DataBases.DatabaseMongo()
@@ -117,19 +116,29 @@ class Server(BaseHTTPRequestHandler):
             self._get_most_popular_search()
         else:
             self._set_response_failure(404)
-            self.wfile.write("Error: unknown request".format(self.path).encode('utf-8'))
+            self.wfile.write("Error: unknown GET request".format(self.path).encode('utf-8'))
 
     def do_POST(self):
+        if self.path != "/distance":
+            self._set_response_failure(404)
+            self.wfile.write("Error: unknown POST request".format(self.path).encode('utf-8'))
+            return
         post_data = self.rfile.read(int(self.headers['Content-Length']))  # <--- Gets the data itself
-        # parse_post_body(str(post_data))
         d = simplejson.loads(post_data)
+        if not check_post_dictionary(d):
+            self._set_response_failure(404)
+            self.wfile.write("Error: wrong POST body".format(self.path).encode('utf-8'))
+            return
+        hits = data.update_cities_distance(d)
+        self._set_response_success(201)
+        response = json.dumps({SOURCE: d[SOURCE], DESTINATION: d[DESTINATION], HITS: hits})
+        response = bytes(response, FORMAT_STR)
+        self.wfile.write(response)
 
-        return
 
-
-def run(server_class=HTTPServer, handler_class=Server, port=8080):
+def run(server_class=HTTPServer, handler_class=Server):
     logging.basicConfig(level=logging.INFO)
-    server_address = ('', port)
+    server_address = ('', PORT)
     httpd = server_class(server_address, handler_class)
     logging.info('Starting httpd...\n')
     try:
@@ -141,9 +150,4 @@ def run(server_class=HTTPServer, handler_class=Server, port=8080):
 
 
 if __name__ == '__main__':
-    from sys import argv
-
-    if len(argv) == 2:
-        run(port=int(argv[1]))
-    else:
-        run()
+    run()
