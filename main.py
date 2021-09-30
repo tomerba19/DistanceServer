@@ -2,8 +2,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import logging
 import CitiesGetter
 import json
-from urllib.parse import urlparse
-from urllib.parse import parse_qs
+import DataBases
 
 
 def get_cities(path: str):
@@ -27,24 +26,48 @@ def get_cities(path: str):
     return source, destination
 
 
+data = DataBases.DatabaseMongo()
+
+
 class Server(BaseHTTPRequestHandler):
-    def _set_response(self):
+
+    def _set_response_success(self):
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
 
-    def do_GET(self):
-        # logging.info("GET request,\nPath: %s\nHeaders:\n%s\n", str(self.path), str(self.headers))
-        self._set_response()
-        if self.path.startswith("/distance?source="):
-            source, destination = get_cities(self.path[1:])
-            if source is None:
-                self.wfile.write("Error! wrong input".format(self.path).encode('utf-8'))
-            else:
+    def _set_response_failure(self):
+        self.send_response(400)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+
+    def _get_find_distance(self):
+        """
+        a function that is being called if the GET request if for distance between two cities.
+        :return: None
+        """
+        source, destination = get_cities(self.path[1:])
+        if source is None:
+            self._set_response_failure()
+            self.wfile.write("Error! wrong input".format(self.path).encode('utf-8'))
+        else:
+            distance = data.get_distance_between_cities(source, destination)
+            if distance == -1:
                 distance = CitiesGetter.get_distance_between_cities(source, destination)
-                response = json.dumps({'distance': distance})
-                response = bytes(response, 'utf-8')
-                self.wfile.write(response)
+                if distance == -1:
+                    self._set_response_failure()
+                    self.wfile.write("Error! wrong input".format(self.path).encode('utf-8'))
+                    return
+                else:
+                    data.add_cities_to_db(source, destination, distance)
+            self._set_response_success()
+            response = json.dumps({'distance': distance})
+            response = bytes(response, 'utf-8')
+            self.wfile.write(response)
+
+    def do_GET(self):
+        if self.path.startswith("/distance?source="):
+            self._get_find_distance()
 
     def do_POST(self):
         content_length = int(self.headers['Content-Length'])  # <--- Gets the size of data

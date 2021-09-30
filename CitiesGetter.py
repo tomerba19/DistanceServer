@@ -1,5 +1,4 @@
 from geopy.geocoders import Nominatim
-from geopy import distance
 import math
 
 
