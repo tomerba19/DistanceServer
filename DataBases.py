@@ -97,8 +97,12 @@ class DatabaseMongo:
         :param dictionary: a dictionary with source, destination and distance keys.
         :return: number of hits of those cities
         """
-        x = self._cities_distance.find({SOURCE: dictionary[SOURCE], DESTINATION: dictionary[DESTINATION]})
-        if x.retrieved == 0:
+        q = {SOURCE: dictionary[SOURCE], DESTINATION: dictionary[DESTINATION]}
+        found = self._cities_distance.find(q)
+        prev_hits = -1
+        for reult in found:
+            prev_hits = reult[HITS]
+        if prev_hits == -1:
             self.add_cities_to_db(dictionary[SOURCE], dictionary[DESTINATION], dictionary[DISTANCE], is_post_insert=True)
             return 0
         else:

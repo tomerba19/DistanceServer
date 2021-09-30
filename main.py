@@ -39,12 +39,14 @@ def check_post_dictionary(dictionary):
     :param dictionary: the dictionary to check
     :return: True if the keys are the expected keys, False else.
     """
-    if len(
-            dictionary) != 3 or DISTANCE not in dictionary.keys() or DESTINATION not in dictionary.keys() or SOURCE not in dictionary.keys():
+    if len(dictionary) != 3 or DISTANCE not in dictionary.keys() or DESTINATION not in \
+            dictionary.keys() or SOURCE not in dictionary.keys():
         return False
     if type(dictionary[DESTINATION]) != str or type(dictionary[SOURCE]) != str:
         return False
     if not isinstance(dictionary[DISTANCE], (int, float)):
+        return False
+    if dictionary[DISTANCE] < 0:
         return False
     return True
 
