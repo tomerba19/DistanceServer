@@ -5,6 +5,7 @@ import json
 import DataBases
 
 
+
 def get_cities(path: str):
     """
     a function that given a GET path of the form 'distance?source=cityone&destination=citytwo returns the cities.
@@ -31,13 +32,13 @@ data = DataBases.DatabaseMongo()
 
 class Server(BaseHTTPRequestHandler):
 
-    def _set_response_success(self):
-        self.send_response(200)
+    def _set_response_success(self, response_code):
+        self.send_response(response_code)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
 
-    def _set_response_failure(self):
-        self.send_response(400)
+    def _set_response_failure(self, response_code):
+        self.send_response(response_code)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
 
@@ -48,19 +49,19 @@ class Server(BaseHTTPRequestHandler):
         """
         source, destination = get_cities(self.path[1:])
         if source is None:
-            self._set_response_failure()
+            self._set_response_failure(404)
             self.wfile.write("Error! wrong input".format(self.path).encode('utf-8'))
         else:
             distance = data.get_distance_between_cities(source, destination)
             if distance == -1:
                 distance = CitiesGetter.get_distance_between_cities(source, destination)
                 if distance == -1:
-                    self._set_response_failure()
+                    self._set_response_failure(404)
                     self.wfile.write("Error! wrong input".format(self.path).encode('utf-8'))
                     return
                 else:
                     data.add_cities_to_db(source, destination, distance)
-            self._set_response_success()
+            self._set_response_success(200)
             response = json.dumps({'distance': distance})
             response = bytes(response, 'utf-8')
             self.wfile.write(response)
@@ -75,7 +76,7 @@ class Server(BaseHTTPRequestHandler):
         logging.info("POST request,\nPath: %s\nHeaders:\n%s\n\nBody:\n%s\n",
                      str(self.path), str(self.headers), post_data.decode('utf-8'))
 
-        self._set_response()
+        self._set_response_success(200)
         self.wfile.write("POST request for {}".format(self.path).encode('utf-8'))
 
 
