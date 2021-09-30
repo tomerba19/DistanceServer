@@ -39,6 +39,8 @@ def check_post_dictionary(dictionary):
     :param dictionary: the dictionary to check
     :return: True if the keys are the expected keys, False else.
     """
+    if not isinstance(dictionary, dict):
+        return False
     if len(dictionary) != 3 or DISTANCE not in dictionary.keys() or DESTINATION not in \
             dictionary.keys() or SOURCE not in dictionary.keys():
         return False
@@ -142,7 +144,13 @@ class Server(BaseHTTPRequestHandler):
             self.wfile.write("Error: unknown POST request".format(self.path).encode('utf-8'))
             return
         post_data = self.rfile.read(int(self.headers['Content-Length']))  # <--- Gets the data itself
-        d = simplejson.loads(post_data)
+        d = None
+        try:
+            d = simplejson.loads(post_data)
+        except Exception:
+            self._set_response(404)
+            self.wfile.write("Error: wrong POST body".format(self.path).encode('utf-8'))
+            return
         if not check_post_dictionary(d):
             self._set_response(404)
             self.wfile.write("Error: wrong POST body".format(self.path).encode('utf-8'))
