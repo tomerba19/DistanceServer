@@ -100,7 +100,7 @@ class DatabaseMongo:
         """
         x = self._cities_distance.find({SOURCE: dictionary[SOURCE], DESTINATION: dictionary[DESTINATION]})
         if x.retrieved == 0:
-            self.add_cities_to_db(dictionary[SOURCE], dictionary[DESTINATION], dictionary[DISTANCE])
+            self.add_cities_to_db(dictionary[SOURCE], dictionary[DESTINATION], dictionary[DISTANCE], is_post_insert=True)
             return 0
         else:
             query1 = {SOURCE: dictionary[SOURCE], DESTINATION: dictionary[DESTINATION]}
@@ -113,6 +113,10 @@ class DatabaseMongo:
                 return result[HITS]
 
     def reset_db(self):
+        """
+        resets the data bases.
+        :return: None
+        """
         self._cities_distance.drop()
         self._max_hits_db.drop()
 
