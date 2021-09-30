@@ -8,20 +8,6 @@ DISTANCE = "distance"
 HITS = "hits"
 
 
-# client = pymongo.MongoClient('localhost', 27017)
-# db = client.test
-# col = db["temp"]
-# col.insert_one({"tomer": 1, "adva": 2})
-# print(col.find_one())
-# col.delete_one({})
-# col.insert_one({"tomer":2, "adva": 1})
-# query = {"tomer": 2}
-# newvalues = {"$set": {"adva": 3}}
-# col.update_one(query, newvalues)
-# for x in col.find():
-#     print(x)
-
-
 class DatabaseMongo:
     """
     a wrapper class for the mongodb databases used for this assignment
@@ -83,3 +69,21 @@ class DatabaseMongo:
              {SOURCE: destination, DESTINATION: source, DISTANCE: distance, HITS: 1}])
         if self._max_hits_db.find_one() is None:  # if it's the first pair of cities then they are the max hits.
             self._max_hits_db.insert_one({SOURCE: source, DESTINATION: destination, DISTANCE: distance, HITS: 1})
+
+    def get_most_popular_search(self):
+        """
+        :return: the attributes of the most popular search
+        """
+        return self._max_hits_db.find_one()
+
+    def check_connection_to_db(self):
+        """
+        a method that checks if the connection to the database is ok.
+        :return: True if ok False else.
+        """
+        try:
+            # The ismaster command is cheap and does not require auth.
+            self._client.admin.command('ismaster')
+            return True
+        except Exception:
+            return False
