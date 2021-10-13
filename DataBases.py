@@ -17,27 +17,6 @@ class DatabaseMongo:
         self._client = pymongo.MongoClient('localhost', 27017)
         self._db = self._client.test
         self._cities_distance = self._db[CITIES_DISTANCE]
-        self._max_hits_db = self._db[MAX_HITS_DB]
-
-    def _update_hits(self, source, destination, distance, prev_hits):
-        """
-        an inner method that updates the hits of the reversed destination and source. also
-        checks if the new number of hits is greater then the max hit and updates it if necessary.
-        :param source: the source city
-        :param destination: the destination city
-        :param distance: the distance between the cities
-        :param prev_hits: the prev number of hits between the 2 cities
-        :return: None
-        """
-        query1 = {SOURCE: source, DESTINATION: destination}
-        query2 = {SOURCE: destination, DESTINATION: source}
-        new_values = {"$set": {HITS: prev_hits + 1}}
-        self._cities_distance.update_one(query1, new_values)
-        self._cities_distance.update_one(query2, new_values)
-        doc3 = self._max_hits_db.find_one()
-        if doc3 is not None and doc3[HITS] < prev_hits + 1:
-            self._max_hits_db.update_one({}, {
-                "$set": {SOURCE: source, DESTINATION: destination, DISTANCE: distance, HITS: prev_hits + 1}})
 
     def get_distance_between_cities(self, source, destination):
         """
@@ -46,13 +25,11 @@ class DatabaseMongo:
         :param destination: destination city
         :return: the distance between the cities sif in the db, -1 else
         """
-        doc1 = self._cities_distance.find({SOURCE: source, DESTINATION: destination})
+        query = {"$or": [{SOURCE: source, DESTINATION: destination}, {SOURCE: destination, DESTINATION: source}]}
+        doc1 = self._cities_distance.find_one_and_update(query, {"$inc": {HITS: 1}})
         distance = -1
-        prev_hits = 0
-        for result in doc1:
-            distance = result[DISTANCE]
-            prev_hits = result[HITS]
-        self._update_hits(source, destination, distance, prev_hits)
+        if doc1:
+            distance = doc1[DISTANCE]
         return distance
 
     def add_cities_to_db(self, source, destination, distance, is_post_insert=False):
@@ -65,21 +42,17 @@ class DatabaseMongo:
         :return: None
         """
         if not is_post_insert:
-            self._cities_distance.insert_many(
-                [{SOURCE: source, DESTINATION: destination, DISTANCE: distance, HITS: 1},
-                 {SOURCE: destination, DESTINATION: source, DISTANCE: distance, HITS: 1}])
-            if self._max_hits_db.find_one() is None:  # if it's the first pair of cities then they are the max hits.
-                self._max_hits_db.insert_one({SOURCE: source, DESTINATION: destination, DISTANCE: distance, HITS: 1})
+            self._cities_distance.insert_one(
+                {SOURCE: source, DESTINATION: destination, DISTANCE: distance, HITS: 1})
         else:
-            self._cities_distance.insert_many(
-                [{SOURCE: source, DESTINATION: destination, DISTANCE: distance, HITS: 0},
-                 {SOURCE: destination, DESTINATION: source, DISTANCE: distance, HITS: 0}])
+            self._cities_distance.insert_one(
+                {SOURCE: source, DESTINATION: destination, DISTANCE: distance, HITS: 0})
 
     def get_most_popular_search(self):
         """
         :return: the attributes of the most popular search
         """
-        return self._max_hits_db.find_one()
+        return self._cities_distance.find_one({}, sort=[(HITS, pymongo.DESCENDING)])
 
     def check_connection_to_db(self):
         """
@@ -97,23 +70,19 @@ class DatabaseMongo:
         :param dictionary: a dictionary with source, destination and distance keys.
         :return: number of hits of those cities
         """
-        q = {SOURCE: dictionary[SOURCE], DESTINATION: dictionary[DESTINATION]}
-        found = self._cities_distance.find(q)
+        q = {"$or": [{SOURCE: dictionary[SOURCE], DESTINATION: dictionary[DESTINATION]}, {SOURCE: dictionary[DESTINATION], DESTINATION: dictionary[SOURCE]}]}
+        found = self._cities_distance.find_one(q)
         prev_hits = -1
-        for reult in found:
-            prev_hits = reult[HITS]
+        if found:
+            prev_hits = found[HITS]
         if prev_hits == -1:
-            self.add_cities_to_db(dictionary[SOURCE], dictionary[DESTINATION], dictionary[DISTANCE], is_post_insert=True)
+            self.add_cities_to_db(dictionary[SOURCE], dictionary[DESTINATION], dictionary[DISTANCE],
+                                  is_post_insert=True)
             return 0
         else:
-            query1 = {SOURCE: dictionary[SOURCE], DESTINATION: dictionary[DESTINATION]}
-            query2 = {SOURCE: dictionary[DESTINATION], DESTINATION: dictionary[SOURCE]}
             new_values = {"$set": {DISTANCE: dictionary[DISTANCE]}}
-            self._cities_distance.update_one(query1, new_values)
-            self._cities_distance.update_one(query2, new_values)
-            temp = self._cities_distance.find(query1)
-            for result in temp:
-                return result[HITS]
+            res = self._cities_distance.find_one_and_update(q, new_values)
+            return res[HITS]
 
     def reset_db(self):
         """
@@ -121,5 +90,3 @@ class DatabaseMongo:
         :return: None
         """
         self._cities_distance.drop()
-        self._max_hits_db.drop()
-

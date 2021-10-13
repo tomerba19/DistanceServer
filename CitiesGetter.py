@@ -39,5 +39,3 @@ def get_distance_between_cities(source, destination):
     d = radius * c
 
     return d
-
-
