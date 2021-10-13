@@ -154,6 +154,8 @@ class Server(BaseHTTPRequestHandler):
             self._set_response(404)
             self.wfile.write("Error: wrong POST body".format(self.path).encode('utf-8'))
             return
+        d[DESTINATION] = d[DESTINATION].lower()
+        d[SOURCE] = d[SOURCE].lower()
         hits = data.update_cities_distance(d)
         self._set_response(201)
         response = json.dumps({SOURCE: d[SOURCE], DESTINATION: d[DESTINATION], HITS: hits})
