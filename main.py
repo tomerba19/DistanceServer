@@ -4,6 +4,8 @@ import CitiesGetter
 import json
 import simplejson
 import DataBases
+from urllib.parse import urlparse
+from urllib.parse import parse_qs
 
 SOURCE = "source"
 DESTINATION = "destination"
@@ -19,19 +21,15 @@ def get_cities(path: str):
     :param path: the path of the GET request
     :return: source, destination if valid, None else
     """
-    if not path.startswith("distance?source="):
-        return None, None
-    first_and = path.find('&')
-    if first_and == -1:
-        return None, None
-    source = path[16:first_and]
-    path = path[first_and:]
-    if not path.startswith("&destination="):
-        return None, None
-    destination = path[13:]
-    if not source.isalpha() or not destination.isalpha():
-        return None, None
-    return source, destination
+    parsed_url = urlparse(path)
+    parsed_dictionary = parse_qs(parsed_url.query)
+    if SOURCE not in parsed_dictionary or DESTINATION not in parsed_dictionary or len(parsed_dictionary) != 2:
+        return None
+    source = parsed_dictionary[SOURCE][0]
+    destination = parse_qs(parsed_url.query)[DESTINATION][0]
+    if source is None or destination is None:
+        return None
+    return source.lower(), destination.lower()
 
 
 def check_post_dictionary(dictionary):
@@ -73,11 +71,12 @@ class Server(BaseHTTPRequestHandler):
         a function that is being called if the GET request if for distance between two cities.
         :return: None
         """
-        source, destination = get_cities(self.path[1:])
-        if source is None:
+        res = get_cities(self.path)
+        if res is None:
             self._set_response(404)
             self.wfile.write("Error! wrong input for distance between cities".format(self.path).encode(FORMAT_STR))
         else:
+            source, destination = res
             distance = data.get_distance_between_cities(source, destination)
             if distance == -1:
                 distance = CitiesGetter.get_distance_between_cities(source, destination)
@@ -124,7 +123,7 @@ class Server(BaseHTTPRequestHandler):
         a function that gets the GET requests from the http server
         :return: None
         """
-        if self.path.startswith("/distance?source="):
+        if self.path.startswith("/distance?"):
             self._get_find_distance()
         elif self.path == "/health":
             self._get_health()
