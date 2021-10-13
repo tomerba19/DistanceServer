@@ -70,7 +70,8 @@ class DatabaseMongo:
         :param dictionary: a dictionary with source, destination and distance keys.
         :return: number of hits of those cities
         """
-        q = {"$or": [{SOURCE: dictionary[SOURCE], DESTINATION: dictionary[DESTINATION]}, {SOURCE: dictionary[DESTINATION], DESTINATION: dictionary[SOURCE]}]}
+        q = {"$or": [{SOURCE: dictionary[SOURCE], DESTINATION: dictionary[DESTINATION]},
+                     {SOURCE: dictionary[DESTINATION], DESTINATION: dictionary[SOURCE]}]}
         found = self._cities_distance.find_one(q)
         prev_hits = -1
         if found:
