@@ -1,6 +1,7 @@
 from geopy.geocoders import Nominatim
 import math
 
+
 def get_city_lat_and_lon(city):
     """
     get the city longitude and latitude from city name using Nominatim
